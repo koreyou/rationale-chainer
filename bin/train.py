@@ -13,9 +13,9 @@ from chainer import training
 from chainer.training import extensions
 from joblib import Memory
 
-import multidomain_sentiment
-from multidomain_sentiment.dataset.blitzer import prepare_blitzer_data
-from multidomain_sentiment.training import SaveRestore, EarlyStoppingTrigger
+import rationale
+from rationale.dataset.blitzer import prepare_blitzer_data
+from rationale.training import SaveRestore, EarlyStoppingTrigger
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -53,13 +53,13 @@ def run(dataset, word2vec, epoch, frequency, gpu, out, model, batchsize, lr,
     w2v, vocab, train_dataset, dev_dataset, _, label_dict, domain_dict = \
         memory.cache(prepare_blitzer_data)(dataset, word2vec)
     if model == 'rnn':
-        model = multidomain_sentiment.models.create_rnn_predictor(
+        model = rationale.models.create_rnn_predictor(
             len(domain_dict), w2v.shape[0], w2v.shape[1], 300, len(label_dict),
             2, 300, dropout_rnn=0.1, initialEmb=w2v, dropout_emb=0.1,
             fix_embedding=fix_embedding
         )
     elif model == 'cnn':
-        model = multidomain_sentiment.models.create_cnn_predictor(
+        model = rationale.models.create_cnn_predictor(
             len(domain_dict), w2v.shape[0], w2v.shape[1], 300, len(label_dict),
             300, dropout_fc=0.1, initialEmb=w2v, dropout_emb=0.1,
             fix_embedding=fix_embedding
@@ -67,7 +67,7 @@ def run(dataset, word2vec, epoch, frequency, gpu, out, model, batchsize, lr,
     else:
         assert not "should not get here"
 
-    classifier = multidomain_sentiment.models.MultiDomainClassifier(
+    classifier = rationale.models.MultiDomainClassifier(
         model, domain_dict=domain_dict)
 
     if gpu >= 0:
@@ -84,7 +84,7 @@ def run(dataset, word2vec, epoch, frequency, gpu, out, model, batchsize, lr,
     # Set up a trainer
     updater = training.StandardUpdater(
         train_iter, optimizer, device=gpu,
-        converter=multidomain_sentiment.training.convert)
+        converter=rationale.training.convert)
 
     if dev_dataset is not None:
         stop_trigger = EarlyStoppingTrigger(
@@ -99,7 +99,7 @@ def run(dataset, word2vec, epoch, frequency, gpu, out, model, batchsize, lr,
 
         evaluator = extensions.Evaluator(
             dev_iter, classifier, device=gpu,
-            converter=multidomain_sentiment.training.convert)
+            converter=rationale.training.convert)
         trainer.extend(evaluator, trigger=frequency)
         # This works together with EarlyStoppingTrigger to provide more reliable
         # early stopping

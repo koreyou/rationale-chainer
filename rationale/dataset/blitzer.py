@@ -24,8 +24,8 @@ import numpy as np
 from nltk.tokenize import word_tokenize
 from chainer.datasets import split_dataset_random
 
-from multidomain_sentiment.word_embedding import load_word_embedding
-from multidomain_sentiment.dataset.common import create_dataset
+from rationale.word_embedding import load_word_embedding
+from rationale.dataset.common import create_dataset
 
 logger = logging.getLogger(__name__)
 
