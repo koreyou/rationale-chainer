@@ -22,6 +22,7 @@ logger = logging.getLogger(__name__)
 
 
 @click.command()
+@click.argument('aspect', type=int)
 @click.argument('train', type=click.Path(exists=True))
 @click.argument('word2vec', type=click.Path(exists=True))
 @click.option('--epoch', '-e', type=int, default=15,
@@ -41,34 +42,36 @@ logger = logging.getLogger(__name__)
               help='Fix word embedding during training')
 @click.option('--resume', '-r', default='',
               help='Resume the training from snapshot')
-def run(train, word2vec, epoch, frequency, gpu, out, test, batchsize, lr,
+def run(aspect, train, word2vec, epoch, frequency, gpu, out, test, batchsize, lr,
         fix_embedding, resume):
     """
-    Train multi-domain user review classification using Blitzer et al.'s dataset
-    (https://www.cs.jhu.edu/~mdredze/datasets/sentiment/)
+    Train "Rationalizing Neural Predictions" for one specified aspect.
 
     Please refer README.md for details.
     """
     memory = Memory(cachedir=out, verbose=1)
-    w2v, vocab, train_dataset, dev_dataset, _, label_dict, domain_dict = \
-        memory.cache(prepare_data)(train, word2vec, test_path=test)
-    model = rationale.models.create_rnn_predictor(
-        len(domain_dict), w2v.shape[0], w2v.shape[1], 300, len(label_dict),
-        2, 300, dropout_rnn=0.1, initialEmb=w2v, dropout_emb=0.1,
-        fix_embedding=fix_embedding
-    )
+    w2v, vocab, dataset, test_dataset = \
+        memory.cache(prepare_data)(train, word2vec, aspect, test_path=test)
+    train_dataset, dev_dataset = chainer.datasets.split_dataset(dataset, -500)
 
-    classifier = rationale.models.MultiDomainClassifier(
-        model, domain_dict=domain_dict)
+    encoder = rationale.models.LSTMEncoder(
+        1, 300,
+    )
+    generator = rationale.models.LSTMGenerator(
+        2, 300, dropout=0.1
+    )
+    model = rationale.models.RationalizedRegressor(
+        generator, encoder, w2v.shape[0], w2v.shape[1], initialEmb=w2v,
+        dropout_emb=0.1, fix_embedding=fix_embedding)
 
     if gpu >= 0:
         # Make a specified GPU current
         chainer.cuda.get_device_from_id(gpu).use()
-        classifier.to_gpu()  # Copy the model to the GPU
+        model.to_gpu()  # Copy the model to the GPU
 
     # Setup an optimizer
     optimizer = chainer.optimizers.Adam(alpha=lr)
-    optimizer.setup(classifier)
+    optimizer.setup(model)
 
     train_iter = chainer.iterators.SerialIterator(train_dataset, batchsize)
 
@@ -77,34 +80,28 @@ def run(train, word2vec, epoch, frequency, gpu, out, test, batchsize, lr,
         train_iter, optimizer, device=gpu,
         converter=rationale.training.convert)
 
-    if dev_dataset is not None:
-        stop_trigger = EarlyStoppingTrigger(
-            monitor='validation/main/loss', max_trigger=(epoch, 'epoch'))
-        trainer = training.Trainer(updater, stop_trigger, out=out)
+    # Set up dev dataset
+    stop_trigger = EarlyStoppingTrigger(
+        monitor='validation/main/loss', max_trigger=(epoch, 'epoch'))
+    trainer = training.Trainer(updater, stop_trigger, out=out)
 
-        logger.info("train: {},  dev: {}".format(
-            len(train_dataset), len(dev_dataset)))
-        # Evaluate the model with the development dataset for each epoch
-        dev_iter = chainer.iterators.SerialIterator(
-            dev_dataset, batchsize, repeat=False, shuffle=False)
+    logger.info("train: {},  dev: {}".format(
+        len(train_dataset), len(dev_dataset)))
+    # Evaluate the model with the development dataset for each epoch
+    dev_iter = chainer.iterators.SerialIterator(
+        dev_dataset, batchsize, repeat=False, shuffle=False)
 
-        evaluator = extensions.Evaluator(
-            dev_iter, classifier, device=gpu,
-            converter=rationale.training.convert)
-        trainer.extend(evaluator, trigger=frequency)
-        # This works together with EarlyStoppingTrigger to provide more reliable
-        # early stopping
-        trainer.extend(
-            SaveRestore(),
-            trigger=chainer.training.triggers.MinValueTrigger(
-                'validation/main/loss'))
-    else:
-        trainer = training.Trainer(updater, (epoch, 'epoch'), out=out)
-        logger.info("train: {}".format(len(train_dataset)))
-        # SaveRestore will save the snapshot when dev_dataset is available
-        trainer.extend(extensions.snapshot(), trigger=frequency)
+    evaluator = extensions.Evaluator(
+        dev_iter, model, device=gpu,
+        converter=rationale.training.convert)
+    trainer.extend(evaluator, trigger=frequency)
+    # This works together with EarlyStoppingTrigger to provide more reliable
+    # early stopping
+    trainer.extend(
+        SaveRestore(),
+        trigger=chainer.training.triggers.MinValueTrigger(
+            'validation/main/loss'))
 
-    logger.info("With labels: %s" % json.dumps(label_dict))
     # Take a snapshot for each specified epoch
     if gpu < 0:
         # ParameterStatistics does not work with GPU as of chainer 2.x

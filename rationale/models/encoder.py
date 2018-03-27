@@ -13,7 +13,7 @@ class LSTM(chainer.Chain):
         dropout (float): The dropout ratio.
     """
     def __init__(self, n_layers, n_units, dropout=0.1):
-        super(RNNEncoder, self).__init__()
+        super(LSTM, self).__init__()
         with self.init_scope():
             self.encoder = L.NStepLSTM(n_layers, n_units, n_units, dropout)
 
