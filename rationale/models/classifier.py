@@ -56,12 +56,15 @@ def select_tokens(x, z):
 
 class RationalizedRegressor(chainer.Chain):
 
-    def __init__(self, generator, encoder, n_vocab, emb_size, initialEmb=None,
+    def __init__(self, generator, encoder, n_vocab, emb_size,
+                 sparsity_coef=0.0003, coherent_coef=2.0, initialEmb=None,
                  dropout_emb=0.1, fix_embedding=False):
         super(RationalizedRegressor, self).__init__()
         if initialEmb is None: initialEmb = embed_init
         self.dropout_emb = dropout_emb
         self.fix_embedding = fix_embedding
+        self.sparsity_coef = sparsity_coef
+        self.coherent_coef = coherent_coef
         with self.init_scope():
             self.embed = L.EmbedID(
                 n_vocab, emb_size, initialW=initialEmb, ignore_label=-1)
@@ -76,11 +79,18 @@ class RationalizedRegressor(chainer.Chain):
 
         # calculate loss for generator
         sparsity_cost = self.xp.array([self.xp.sum(zi.data) for zi in z])
+        reporter.report({'generator/sparsity_cost': self.xp.sum(sparsity_cost)}, self)
         conherence_cost = self.xp.array(
             [np.linalg.norm(zi.data[:-1]- zi.data[1:]) for zi in z])
-        cost = (pred.data - ys) ** 2 + sparsity_cost + conherence_cost
+        reporter.report({'generator/conherence_cost': self.xp.sum(conherence_cost)}, self)
+        regressor_cost = (pred.data - ys) ** 2
+        reporter.report({'generator/regressor_cost': self.xp.sum(regressor_cost)}, self)
+        cost = (regressor_cost +
+                self.sparsity_coef * sparsity_cost +
+                self.coherent_coef * conherence_cost)
         loss_generator = cost * F.log(F.stack(map(F.sum, z)))
         reporter.report({'generator/cost': self.xp.sum(cost)}, self)
+        reporter.report({'generator/loss': self.xp.sum(loss_generator.data)}, self)
 
         loss = loss_encoder + F.sum(loss_generator)
         reporter.report({'loss': loss.data}, self)
