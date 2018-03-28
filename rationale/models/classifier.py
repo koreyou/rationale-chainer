@@ -73,22 +73,28 @@ class RationalizedRegressor(chainer.Chain):
 
     def __call__(self, xs, ys):
         pred, z = self._forward(xs)
+        z_pred = [F.sigmoid(zi) for zi in z]
         # calculate loss for encoder
         loss_encoder = F.mean_squared_error(pred, ys)
         reporter.report({'encoder/loss': loss_encoder}, self)
 
         # calculate loss for generator
-        sparsity_cost = self.xp.array([self.xp.sum(zi.data) for zi in z])
+        sparsity_cost = self.xp.array([self.xp.sum(zi.data) for zi in z_pred])
         reporter.report({'generator/sparsity_cost': self.xp.sum(sparsity_cost)}, self)
         conherence_cost = self.xp.array(
-            [np.linalg.norm(zi.data[:-1]- zi.data[1:]) for zi in z])
+            [np.linalg.norm(zi.data[:-1]- zi.data[1:]) for zi in z_pred])
         reporter.report({'generator/conherence_cost': self.xp.sum(conherence_cost)}, self)
         regressor_cost = (pred.data - ys) ** 2
         reporter.report({'generator/regressor_cost': self.xp.sum(regressor_cost)}, self)
         cost = (regressor_cost +
                 self.sparsity_coef * sparsity_cost +
                 self.coherent_coef * conherence_cost)
-        loss_generator = cost * F.log(F.stack(map(F.sum, z)))
+        # log(p(z|x)) = log(prod(p(z|x)))
+        #             = log(prod(sigmoid(zi)))
+        #             = sum(log(sigmoid(zi)))
+        #             = sum(-log1p(e^-zi))
+        gen_prob = F.stack([F.sum(-F.log1p(F.exp(-zi))) for zi in z])
+        loss_generator = cost * gen_prob
         reporter.report({'generator/cost': self.xp.sum(cost)}, self)
         reporter.report({'generator/loss': self.xp.sum(loss_generator.data)}, self)
 
@@ -104,7 +110,8 @@ class RationalizedRegressor(chainer.Chain):
         z = self.generator(exs)
         if self.xp.isnan(self.xp.sum((self.xp.sum(zi.data) for zi in z))):
             raise ValueError("NaN detected in forward operation of generator")
-        xs_selected = select_tokens(exs, z)
+        # we apply sigmoid here to avoid numerical instability in cost
+        xs_selected = select_tokens(exs, [F.sigmoid(zi) for zi in z])
         y = self.encoder(xs_selected)
         if self.xp.isnan(self.xp.sum(y.data)):
             raise ValueError("NaN detected in forward operation of encoder")
