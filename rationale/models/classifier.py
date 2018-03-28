@@ -102,8 +102,12 @@ class RationalizedRegressor(chainer.Chain):
             for i in six.moves.xrange(len(exs)):
                 exs[i].unchain_backward()
         z = self.generator(exs)
+        if self.xp.isnan(self.xp.sum((self.xp.sum(zi.data) for zi in z))):
+            raise ValueError("NaN detected in forward operation of generator")
         xs_selected = select_tokens(exs, z)
         y = self.encoder(xs_selected)
+        if self.xp.isnan(self.xp.sum(y.data)):
+            raise ValueError("NaN detected in forward operation of encoder")
         return y, z
 
     def predict(self, xs):
