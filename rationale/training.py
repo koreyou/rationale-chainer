@@ -41,10 +41,8 @@ def convert(batch, device):
             xp = cuda.cupy.get_array_module(*batch)
             return xp.array(batch)
 
-    keys = list(six.iterkeys(batch[0]))
     return {'xs': to_device_batch_seq([b['xs'] for b in batch]),
-            'ys': to_device_batch([b['ys'] for b in batch]),
-            'domains': to_device_batch([b['domains'] for b in batch])}
+            'ys': to_device_batch([b['ys'] for b in batch])}
 
 
 def _snapshot_object(_, target, filename, savefun):

@@ -46,9 +46,12 @@ def select_tokens(x, z):
         z (list of Variable): Each variable is of shape (sequence, 1)
 
     Returns:
+        list of numpy.ndarray or cupy.ndarray
 
     """
-    return [xi[zi] for xi, zi in zip(x, z)]
+    # sample from binomial distribution regarding z as probability
+    return [xi.data[np.random.binomial(np.ones(zi.shape, dtype=np.int32), zi.data)]
+            for xi, zi in zip(x, z)]
 
 
 class RationalizedRegressor(chainer.Chain):
@@ -69,16 +72,14 @@ class RationalizedRegressor(chainer.Chain):
         pred, z = self._forward(xs)
         # calculate loss for encoder
         loss_encoder = F.mean_squared_error(pred, ys)
-        accuracy = F.accuracy(pred, ys)
         reporter.report({'encoder/loss': loss_encoder}, self)
-        reporter.report({'accuracy': accuracy.data}, self)
 
         # calculate loss for generator
-        sparsity_cost = self.xp.concatenate(map(self.xp.sum, z.data))
-        conherence_cost = self.xp.concatenate(
-            [np.linalg.norm(zi[:-1]- zi[1:]) for zi in z.data])
+        sparsity_cost = self.xp.array([self.xp.sum(zi.data) for zi in z])
+        conherence_cost = self.xp.array(
+            [np.linalg.norm(zi.data[:-1]- zi.data[1:]) for zi in z])
         cost = (pred.data - ys) ** 2 + sparsity_cost + conherence_cost
-        loss_generator = cost * F.log(F.sum(z, axis=1))
+        loss_generator = cost * F.log(F.stack(map(F.sum, z)))
         reporter.report({'generator/cost': self.xp.sum(cost)}, self)
 
         loss = loss_encoder + F.sum(loss_generator)

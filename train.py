@@ -52,13 +52,14 @@ def run(aspect, train, word2vec, epoch, frequency, gpu, out, test, batchsize, lr
     memory = Memory(cachedir=out, verbose=1)
     w2v, vocab, dataset, test_dataset = \
         memory.cache(prepare_data)(train, word2vec, aspect, test_path=test)
-    train_dataset, dev_dataset = chainer.datasets.split_dataset(dataset, -500)
+    train_dataset, dev_dataset = chainer.datasets.split_dataset(
+        dataset, len(dataset) - 500)
 
     encoder = rationale.models.LSTMEncoder(
-        1, 300,
+        w2v.shape[1], 1, 300,
     )
     generator = rationale.models.LSTMGenerator(
-        2, 300, dropout=0.1
+        w2v.shape[1], 2, 300, dropout=0.1
     )
     model = rationale.models.RationalizedRegressor(
         generator, encoder, w2v.shape[0], w2v.shape[1], initialEmb=w2v,
