@@ -151,6 +151,12 @@ def run(aspect, train, word2vec, epoch, frequency, gpu, out, test, batchsize,
     with open(os.path.join(out, 'vocab.json'), 'w') as fout:
         json.dump(vocab, fout)
 
+    if test_dataset is not None:
+        results = rationale.prediction.test(model, test_dataset, inv_vocab,
+                                            device=gpu, batchsize=batchsize)
+        with open(os.path.join(out, 'output.json'), 'w') as fout:
+            json.dump(results, fout)
+
 
 if __name__ == '__main__':
     run()

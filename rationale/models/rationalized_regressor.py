@@ -8,6 +8,15 @@ from chainer import reporter
 embed_init = chainer.initializers.Uniform(.25)
 
 
+def sparsity_cost(z):
+    xp = chainer.cuda.get_array_module(z[0])
+    return xp.stack([xp.sum(zi) for zi in z])
+
+def coherence_cost(z):
+    xp = chainer.cuda.get_array_module(z[0])
+    return xp.stack([xp.linalg.norm(zi[:-1] - zi[1:]) for zi in z])
+
+
 def sequence_embed(embed, xs, dropout=0.):
     """Efficient embedding function for variable-length sequences
 
@@ -56,33 +65,48 @@ class RationalizedRegressor(chainer.Chain):
             self.generator = generator
 
     def __call__(self, xs, ys):
+        pred, z = self.forward(xs)
+        loss = self.calc_loss(pred, z, ys)[0]
+        return F.sum(loss)
+
+    def calc_loss(self, pred, z, ys):
+        """
+
+        Args:
+            pred (chainer.Variable): Predicted score
+            z (list of chianer.Variable):
+            ys (chainer.Variable): Ground truth score
+
+        Returns:
+
+        """
         xp = self.xp
-        pred, z = self._forward(xs)
+
         # calculate loss for encoder
-        loss_encoder = F.mean_squared_error(pred, ys)
-        reporter.report({'encoder/loss': loss_encoder}, self)
+        loss_encoder = (pred - ys) ** 2
+        reporter.report({'encoder/loss': xp.sum(loss_encoder.data)}, self)
 
         # calculate loss for generator
-        sparsity_cost = xp.stack([xp.sum(zi.data) for zi in z])
-        reporter.report({'generator/sparsity_cost': xp.sum(sparsity_cost)}, self)
-        coherence_cost = xp.stack(
-            [xp.linalg.norm(zi.data[:-1]- zi.data[1:]) for zi in z])
-        reporter.report({'generator/conherence_cost': xp.sum(coherence_cost)}, self)
-        regressor_cost = (pred.data - ys) ** 2
+        z_data = [zi.data for zi in z]
+        sparsity = sparsity_cost(z_data)
+        reporter.report({'generator/sparsity_cost': xp.sum(sparsity)}, self)
+        coherence = coherence_cost(z_data)
+        reporter.report({'generator/conherence_cost': xp.sum(coherence)}, self)
+        regressor_cost = loss_encoder.data
         reporter.report({'generator/regressor_cost': xp.sum(regressor_cost)}, self)
         cost = (regressor_cost +
-                self.sparsity_coef * sparsity_cost +
-                self.coherent_coef * coherence_cost)
+                self.sparsity_coef * sparsity +
+                self.coherent_coef * coherence)
         gen_prob = F.stack([F.prod(zi) for zi in z])
         loss_generator = cost * gen_prob
         reporter.report({'generator/cost': xp.sum(cost)}, self)
         reporter.report({'generator/loss': xp.sum(loss_generator.data)}, self)
 
-        loss = loss_encoder + F.sum(loss_generator)
-        reporter.report({'loss': loss.data}, self)
-        return loss
+        loss = loss_encoder + loss_generator
+        reporter.report({'loss': xp.sum(loss.data)}, self)
+        return loss, loss_encoder, sparsity, coherence, regressor_cost, loss_generator
 
-    def _forward(self, xs):
+    def forward(self, xs):
         xp = self.xp
         exs = sequence_embed(self.embed, xs, self.dropout_emb)
         if self.fix_embedding:
@@ -104,6 +128,13 @@ class RationalizedRegressor(chainer.Chain):
             selection = self.xp.random.rand(*zi.shape) < zi.data
         return xi[selection]
 
+    def _sample_deterministic(self, xi, zi):
+        selection = 0.5 < zi.data
+        if not self.xp.any(selection):
+            return xi[np.argmax(zi.data):np.argmax(zi.data) + 1]
+        else:
+            return xi[selection]
+
     def select_tokens(self, x, z):
         """
 
@@ -119,16 +150,17 @@ class RationalizedRegressor(chainer.Chain):
             # sample from binomial distribution regarding z as probability
             y = [self._sample_prob(xi, zi) for xi, zi in zip(x, z)]
         else:
-            y = [xi[0.5 < zi.data] for xi, zi in zip(x, z)]
-            if len(y) == 0:
-                y = [xi[np.argmax(zi.data):np.argmax(zi.data) + 1]
-                     for xi, zi in zip(x, z)]
+            y = [self._sample_deterministic(xi, zi) for xi, zi in zip(x, z)]
         return y
 
     def predict(self, xs):
-        y, _ = self._forward(xs)
+        y, z = self.forward(xs)
+        return y.data, [zi.data for zi in z]
+
+    def predict_class(self, xs):
+        y, _ = self.forward(xs)
         return y.data
 
     def predict_rationale(self, xs):
-        _, z = self._forward(xs)
+        _, z = self.forward(xs)
         return [zi.data for zi in z]
