@@ -97,6 +97,13 @@ class RationalizedRegressor(chainer.Chain):
             raise ValueError("NaN detected in forward operation of encoder")
         return y, z
 
+    def _sample_prob(self, xi, zi):
+        selection = [False]
+        # sample for as many as needed to get at least one token
+        while not self.xp.any(selection):
+            selection = self.xp.random.rand(*zi.shape) < zi.data
+        return xi[selection]
+
     def select_tokens(self, x, z):
         """
 
@@ -108,13 +115,9 @@ class RationalizedRegressor(chainer.Chain):
             list of numpy.ndarray or cupy.ndarray
 
         """
-        y = []
-        # sample for as many as needed to get at least one token
         if chainer.config.train:
-            while len(y) == 0:
-                # sample from binomial distribution regarding z as probability
-                y = [xi[self.xp.random.rand(*zi.shape) < zi.data]
-                     for xi, zi in zip(x, z)]
+            # sample from binomial distribution regarding z as probability
+            y = [self._sample_prob(xi, zi) for xi, zi in zip(x, z)]
         else:
             y = [xi[0.5 < zi.data] for xi, zi in zip(x, z)]
             if len(y) == 0:
