@@ -110,10 +110,16 @@ class RationalizedRegressor(chainer.Chain):
         """
         y = []
         # sample for as many as needed to get at least one token
-        while len(y) == 0:
-            # sample from binomial distribution regarding z as probability
-            y = [xi[self.xp.random.rand(*zi.shape) < zi.data]
-                 for xi, zi in zip(x, z)]
+        if chainer.config.train:
+            while len(y) == 0:
+                # sample from binomial distribution regarding z as probability
+                y = [xi[self.xp.random.rand(*zi.shape) < zi.data]
+                     for xi, zi in zip(x, z)]
+        else:
+            y = [xi[0.5 < zi.data] for xi, zi in zip(x, z)]
+            if len(y) == 0:
+                y = [xi[np.argmax(zi.data):np.argmax(zi.data) + 1]
+                     for xi, zi in zip(x, z)]
         return y
 
     def predict(self, xs):
