@@ -40,7 +40,8 @@ def _read_beer_dataset(path, aspect, vocab, max_tokens):
         for line in fin:
             s, words = line.strip().split("\t")
             s = list(map(float, s.split(" ")))
-            tokens= [vocab.get(w, vocab['<unk>']) for w in words[:max_tokens]]
+            tokens= [vocab.get(w, vocab['<unk>'])
+                     for w in words.split(" ")[:max_tokens]]
             if len(tokens) == 0:
                 continue
             xs.append(np.array(tokens, np.int32))
