@@ -38,12 +38,16 @@ logger = logging.getLogger(__name__)
 @click.option('--batchsize', '-b', type=int, default=256,
               help='Number of images in each mini-batch')
 @click.option('--lr', type=float, default=0.000002, help='Learning rate')
+@click.option('--sparsity-coef', type=float, default=0.0003,
+              help='Sparsity cost coefficient lambda_1')
+@click.option('--coherent-coef', type=float, default=2.0,
+              help='Coherence cost coefficient lambda_2')
 @click.option('--fix_embedding', type=bool, default=False,
               help='Fix word embedding during training')
 @click.option('--resume', '-r', default='',
               help='Resume the training from snapshot')
-def run(aspect, train, word2vec, epoch, frequency, gpu, out, test, batchsize, lr,
-        fix_embedding, resume):
+def run(aspect, train, word2vec, epoch, frequency, gpu, out, test, batchsize,
+        lr, sparsity_coef, coherent_coef, fix_embedding, resume):
     """
     Train "Rationalizing Neural Predictions" for one specified aspect.
 
@@ -63,7 +67,9 @@ def run(aspect, train, word2vec, epoch, frequency, gpu, out, test, batchsize, lr
     )
     model = rationale.models.RationalizedRegressor(
         generator, encoder, w2v.shape[0], w2v.shape[1], initialEmb=w2v,
-        dropout_emb=0.1, fix_embedding=fix_embedding)
+        dropout_emb=0.1, fix_embedding=fix_embedding,
+        sparsity_coef=sparsity_coef, coherent_coef=coherent_coef
+    )
 
     if gpu >= 0:
         # Make a specified GPU current
