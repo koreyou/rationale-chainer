@@ -122,7 +122,7 @@ class RationalizedRegressor(chainer.Chain):
         return y, z
 
     def _sample_prob(self, xi, zi):
-        selection = [False]
+        selection = self.xp.array([False])
         # sample for as many as needed to get at least one token
         while not self.xp.any(selection):
             selection = self.xp.random.rand(*zi.shape) < zi.data
