@@ -58,23 +58,22 @@ class RationalizedRegressor(chainer.Chain):
     def __call__(self, xs, ys):
         xp = self.xp
         pred, z = self._forward(xs)
-        z_pred = [F.sigmoid(zi) for zi in z]
         # calculate loss for encoder
         loss_encoder = F.mean_squared_error(pred, ys)
         reporter.report({'encoder/loss': loss_encoder}, self)
 
         # calculate loss for generator
-        sparsity_cost = xp.stack([xp.sum(zi.data) for zi in z_pred])
+        sparsity_cost = xp.stack([xp.sum(zi.data) for zi in z])
         reporter.report({'generator/sparsity_cost': xp.sum(sparsity_cost)}, self)
         conherence_cost = xp.stack(
-            [xp.linalg.norm(zi.data[:-1]- zi.data[1:]) for zi in z_pred])
+            [xp.linalg.norm(zi.data[:-1]- zi.data[1:]) for zi in z])
         reporter.report({'generator/conherence_cost': xp.sum(conherence_cost)}, self)
         regressor_cost = (pred.data - ys) ** 2
         reporter.report({'generator/regressor_cost': xp.sum(regressor_cost)}, self)
         cost = (regressor_cost +
                 self.sparsity_coef * sparsity_cost +
                 self.coherent_coef * conherence_cost)
-        gen_prob = F.stack([F.prod(F.sigmoid(zi)) for zi in z])
+        gen_prob = F.stack([F.prod(zi) for zi in z])
         loss_generator = cost * gen_prob
         reporter.report({'generator/cost': xp.sum(cost)}, self)
         reporter.report({'generator/loss': xp.sum(loss_generator.data)}, self)
@@ -92,8 +91,7 @@ class RationalizedRegressor(chainer.Chain):
         z = self.generator(exs)
         if xp.isnan(xp.sum(xp.stack([xp.sum(zi.data) for zi in z]))):
             raise ValueError("NaN detected in forward operation of generator")
-        # we apply sigmoid here to avoid numerical instability in cost
-        exs_selected = self.select_tokens(exs, [F.sigmoid(zi) for zi in z])
+        exs_selected = self.select_tokens(exs, z)
         y = self.encoder(exs_selected)
         if xp.isnan(xp.sum(y.data)):
             raise ValueError("NaN detected in forward operation of encoder")
@@ -124,4 +122,4 @@ class RationalizedRegressor(chainer.Chain):
 
     def predict_rationale(self, xs):
         _, z = self._forward(xs)
-        return [F.sigmoid(zi).data for zi in z]
+        return [zi.data for zi in z]

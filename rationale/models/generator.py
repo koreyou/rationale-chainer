@@ -19,5 +19,5 @@ class LSTMGenerator(chainer.Chain):
             o = [F.dropout(o_i, self.dropout_fc) for o_i in o]
         # we apply sigmoid in RationalizedRegressor to avoid numerical
         # instability in calculating cost
-        o = [F.squeeze(self.l1(o_i), 1) for o_i in o]
+        o = [F.sigmoid(F.squeeze(self.l1(o_i), 1)) for o_i in o]
         return o
