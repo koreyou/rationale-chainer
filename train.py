@@ -6,16 +6,16 @@ import logging
 import os
 
 import chainer
-import dill  # This is for joblib to use dill. Do NOT delete it.
 import click
+import dill  # This is for joblib to use dill. Do NOT delete it.
+import numpy as np
 from chainer import training
 from chainer.training import extensions
 from joblib import Memory
 
 import rationale
-from rationale.training import SaveRestore, EarlyStoppingTrigger
-from rationale.models import LSTMGenerator, LSTMEncoder, RationalizedRegressor
 from rationale.dataset import prepare_data
+from rationale.training import SaveRestore, EarlyStoppingTrigger
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -98,6 +98,21 @@ def run(aspect, train, word2vec, epoch, frequency, gpu, out, test, batchsize, lr
         dev_iter, model, device=gpu,
         converter=rationale.training.convert)
     trainer.extend(evaluator, trigger=frequency)
+
+    inv_vocab = {v: k for k, v in vocab.items()}
+
+    @chainer.training.make_extension()
+    def monitor_rationale(_):
+        batch = dev_dataset[np.random.choice(len(dev_dataset))]
+        batch = rationale.training.convert([batch], gpu)
+        z = chainer.cuda.to_cpu(model.predict_rationale(batch['xs'])[0])
+        source = [inv_vocab[int(xi)] for xi in chainer.cuda.to_cpu(batch['xs'][0])]
+        result = [t if zi > 0.5 else '_' for t, zi in zip(source, z)]
+        print('# source : ' + ' '.join(source))
+        print('# result : ' + ' '.join(result))
+
+    trainer.extend(monitor_rationale, trigger=(10, 'iteration'))
+
     # This works together with EarlyStoppingTrigger to provide more reliable
     # early stopping
     trainer.extend(

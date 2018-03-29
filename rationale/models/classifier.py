@@ -117,3 +117,7 @@ class RationalizedRegressor(chainer.Chain):
     def predict(self, xs):
         y, _ = self._forward(xs)
         return y.data
+
+    def predict_rationale(self, xs):
+        _, z = self._forward(xs)
+        return [F.sigmoid(zi).data for zi in z]
