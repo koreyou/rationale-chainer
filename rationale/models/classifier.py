@@ -74,11 +74,7 @@ class RationalizedRegressor(chainer.Chain):
         cost = (regressor_cost +
                 self.sparsity_coef * sparsity_cost +
                 self.coherent_coef * conherence_cost)
-        # log(p(z|x)) = log(prod(p(z|x)))
-        #             = log(prod(sigmoid(zi)))
-        #             = sum(log(sigmoid(zi)))
-        #             = sum(-log1p(e^-zi))
-        gen_prob = F.stack([F.sum(-F.log1p(F.exp(-zi))) for zi in z])
+        gen_prob = F.stack([F.prod(F.sigmoid(zi)) for zi in z])
         loss_generator = cost * gen_prob
         reporter.report({'generator/cost': xp.sum(cost)}, self)
         reporter.report({'generator/loss': xp.sum(loss_generator.data)}, self)
