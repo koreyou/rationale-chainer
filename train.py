@@ -35,9 +35,9 @@ logger = logging.getLogger(__name__)
 @click.option('--out', '-o', default='result',
               help='Directory to output the result and temporaly file')
 @click.option('--test', '-o', default=None, type=click.Path(exists=True))
-@click.option('--batchsize', '-b', type=int, default=300,
+@click.option('--batchsize', '-b', type=int, default=256,
               help='Number of images in each mini-batch')
-@click.option('--lr', type=float, default=0.001, help='Learning rate')
+@click.option('--lr', type=float, default=0.000002, help='Learning rate')
 @click.option('--fix_embedding', type=bool, default=False,
               help='Fix word embedding during training')
 @click.option('--resume', '-r', default='',
@@ -73,6 +73,8 @@ def run(aspect, train, word2vec, epoch, frequency, gpu, out, test, batchsize, lr
     # Setup an optimizer
     optimizer = chainer.optimizers.Adam(alpha=lr)
     optimizer.setup(model)
+    optimizer.add_hook(chainer.optimizer.GradientClipping(3.0))
+    optimizer.add_hook(chainer.optimizer.WeightDecay(2.5e-4))
 
     train_iter = chainer.iterators.SerialIterator(train_dataset, batchsize)
 
