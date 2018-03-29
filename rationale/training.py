@@ -39,7 +39,7 @@ def convert(batch, device):
             return chainer.dataset.to_device(device, batch)
         else:
             xp = cuda.cupy.get_array_module(*batch)
-            return xp.array(batch)
+            return chainer.dataset.to_device(device, xp.array(batch))
 
     return {'xs': to_device_batch_seq([b['xs'] for b in batch]),
             'ys': to_device_batch([b['ys'] for b in batch])}
