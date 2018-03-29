@@ -110,9 +110,13 @@ class RationalizedRegressor(chainer.Chain):
             list of numpy.ndarray or cupy.ndarray
 
         """
-        # sample from binomial distribution regarding z as probability
-        return [xi[self.xp.random.rand(*zi.shape) < zi.data]
-                for xi, zi in zip(x, z)]
+        y = []
+        # sample for as many as needed to get at least one token
+        while len(y) == 0:
+            # sample from binomial distribution regarding z as probability
+            y = [xi[self.xp.random.rand(*zi.shape) < zi.data]
+                 for xi, zi in zip(x, z)]
+        return y
 
     def predict(self, xs):
         y, _ = self._forward(xs)
