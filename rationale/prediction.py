@@ -25,7 +25,6 @@ def test(model, dataset, inv_vocab, device=-1, batchsize=128):
             `number of labels`.
 
     """
-    #import pdb; pdb.set_trace()
     if device >= 0:
         model.to_gpu(device)
 
@@ -51,6 +50,7 @@ def test(model, dataset, inv_vocab, device=-1, batchsize=128):
         results.extend(({
             'x': xs[i],
             'z': z[i],
+            'y': y[i],
             'text': [inv_vocab[t] for t in xs[i]],
             'rationale': [inv_vocab[t] if zt > 0.5 else '_'
                           for t, zt in zip(xs[i], z[i])],
