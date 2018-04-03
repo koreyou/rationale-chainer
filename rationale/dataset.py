@@ -4,6 +4,7 @@ from __future__ import absolute_import, division, print_function, \
 
 import codecs
 import gzip
+import json
 import logging
 
 import numpy as np
@@ -14,22 +15,24 @@ from rationale.word_embedding import load_word_embedding
 logger = logging.getLogger(__name__)
 
 
-def prepare_data(train_path, word2vec_path, aspect, test_path=None):
+def prepare_data(train, word2vec_path, aspect, test=None, annotation=None):
     logger.info("Preparing data")
 
     logger.info("Loading word embedding")
     w2v, vocab = load_word_embedding(word2vec_path, max_vocab=100000)
 
     logger.info("Creating dataset")
-    train_dataset = _read_beer_dataset(train_path, aspect, vocab, max_tokens=100)
+    if train is not None:
+        train = _read_beer_dataset(train, aspect, vocab, max_tokens=100)
 
-    if test_path is not None:
-        test_dataset = _read_beer_dataset(
-            test_path, aspect, vocab, max_tokens=50)
-    else:
-        test_dataset = None
+    if test is not None:
+        test = _read_beer_dataset(test, aspect, vocab, max_tokens=50)
 
-    return w2v, vocab, train_dataset, test_dataset
+    if annotation is not None:
+        annotation = _read_annotation(
+            annotation, aspect, vocab, max_tokens=10000000)
+
+    return w2v, vocab, train, test, annotation
 
 
 def _read_beer_dataset(path, aspect, vocab, max_tokens):
@@ -48,3 +51,23 @@ def _read_beer_dataset(path, aspect, vocab, max_tokens):
             scores.append(s[aspect])
 
     return DictDataset(xs=xs, ys=np.array(scores, dtype=np.float32))
+
+
+def _read_annotation(path, aspect, vocab, max_tokens):
+    xs = []
+    scores = []
+    intervals = []
+    with open(path) as fin:
+        for line in fin:
+            d = json.loads(line.strip())
+            words = d['x']
+            tokens = [vocab.get(w, vocab['<unk>']) for w in words[:max_tokens]]
+            if len(tokens) == 0:
+                continue
+            s = d['y']
+            xs.append(np.array(tokens, np.int32))
+            scores.append(s[aspect])
+            intervals.append(d[str(aspect)])
+
+    return DictDataset(
+        xs=xs, ys=np.array(scores, dtype=np.float32), intervals=intervals)

@@ -62,3 +62,45 @@ def test(model, dataset, inv_vocab, device=-1, batchsize=128):
             'loss_generator': float(loss_generator[i])
         } for i in range(len(y))))
     return results
+
+
+def evaluate_rationale(model, dataset, device=-1, batchsize=128):
+    if device >= 0:
+        model.to_gpu(device)
+    it = SerialIterator(dataset, batchsize, repeat=False, shuffle=False)
+
+    tot_mse = 0.0
+    accum_precision = 0.0  # for calculating macro precision
+    true_positives = 0.0  # for calculating micro precision
+    tot_z, tot_n = 1e-10, 1e-10
+    for batch in it:
+        in_arrays = convert(batch, device)
+        with chainer.function.no_backprop_mode(), using_config('train', False):
+            y, z = model.forward(in_arrays['xs'])
+            _, _, _, _, regressor_cost, _ = \
+                model.calc_loss(y, z, in_arrays['ys'])
+        regressor_cost = to_cpu(regressor_cost)
+        z = [to_cpu(zi.data).tolist() for zi in z]
+
+        tot_mse += regressor_cost.sum()
+
+        for bi, zi in zip(batch, z):
+            true_z_interval = bi['intervals']
+            zi = [1 if zij > 0.5 else 0 for zij in zi]
+            nzi = sum(zi)
+            tp = sum(
+                1 for i, zij in enumerate(zi)
+                if (zij and any(i >= u[0] and i < u[1] for u in true_z_interval)))
+            if nzi == 0:
+                # precision is undefined when there is 0 prediction
+                continue
+            accum_precision += tp / nzi
+            tot_n += 1
+            true_positives += tp
+            tot_z += nzi
+    result = {
+        "mse": tot_mse/len(dataset),
+        "macro_precision": accum_precision/tot_n,
+        "micro_precision": true_positives/tot_z,
+    }
+    return result
