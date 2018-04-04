@@ -37,4 +37,4 @@ class LSTMEncoder(chainer.Chain):
         o = self.encoder(x)
         if self.dropout_fc > 0.:
             o = F.dropout(o, self.dropout_fc)
-        return F.squeeze(self.l1(o), 1)
+        return F.sigmoid(F.squeeze(self.l1(o), 1))
