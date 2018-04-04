@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 @click.argument('aspect', type=int)
 @click.argument('train', type=click.Path(exists=True))
 @click.argument('word2vec', type=click.Path(exists=True))
-@click.option('--epoch', '-e', type=int, default=15,
+@click.option('--epoch', '-e', type=int, default=100,
               help='Number of sweeps over the dataset to train')
 @click.option('--frequency', '-f', default=[1, 'epoch'],
               type=(int, click.Choice(['epoch', 'iteration'])),
@@ -37,7 +37,8 @@ logger = logging.getLogger(__name__)
 @click.option('--test', '-o', default=None, type=click.Path(exists=True))
 @click.option('--batchsize', '-b', type=int, default=256,
               help='Number of images in each mini-batch')
-@click.option('--lr', type=float, default=0.000002, help='Learning rate')
+@click.option('--lr', type=float, default=0.0005,
+              help='Unnormalized learning rate to batch size')
 @click.option('--sparsity-coef', type=float, default=0.0003,
               help='Sparsity cost coefficient lambda_1')
 @click.option('--coherent-coef', type=float, default=2.0,
@@ -62,8 +63,9 @@ def run(aspect, train, word2vec, epoch, frequency, gpu, out, test, batchsize,
     encoder = rationale.models.LSTMEncoder(
         w2v.shape[1], 1, 300,
     )
+    # Original impl. uses two layers to model bi-directional LSTM
     generator = rationale.models.LSTMGenerator(
-        w2v.shape[1], 2, 300, dropout=0.1
+        w2v.shape[1], 1, 300, dropout=0.1
     )
     model = rationale.models.RationalizedRegressor(
         generator, encoder, w2v.shape[0], w2v.shape[1], initialEmb=w2v,
@@ -76,11 +78,15 @@ def run(aspect, train, word2vec, epoch, frequency, gpu, out, test, batchsize,
         chainer.cuda.get_device_from_id(gpu).use()
         model.to_gpu()  # Copy the model to the GPU
 
-    # Setup an optimizer
-    optimizer = chainer.optimizers.Adam(alpha=lr)
+    # Impl. by author uses mean as loss. Let's divide lr by batchsize to have
+    # similar effect
+    optimizer = chainer.optimizers.Adam(alpha=lr / batchsize)
     optimizer.setup(model)
     optimizer.add_hook(chainer.optimizer.GradientClipping(3.0))
-    optimizer.add_hook(chainer.optimizer.WeightDecay(2.5e-4))
+    l2_reg = 1e-6
+    # Impl. by author implements Weight decay as L2 loss, thus multiplying it
+    # by the learning rate. Let's implement it that way.
+    optimizer.add_hook(chainer.optimizer.WeightDecay(l2_reg * lr))
 
     train_iter = chainer.iterators.SerialIterator(train_dataset, batchsize)
 
