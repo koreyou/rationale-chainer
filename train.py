@@ -56,7 +56,7 @@ def run(aspect, train, word2vec, epoch, frequency, gpu, out, test, batchsize,
     """
     memory = Memory(cachedir='.', verbose=1)
     w2v, vocab, dataset, test_dataset, _ = \
-        memory.cache(prepare_data)(train, word2vec, aspect, test_path=test)
+        memory.cache(prepare_data)(train, word2vec, aspect, test=test)
     train_dataset, dev_dataset = chainer.datasets.split_dataset(
         dataset, len(dataset) - 500)
 
