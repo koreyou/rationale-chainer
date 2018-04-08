@@ -14,7 +14,8 @@ def sparsity_cost(z):
 
 def coherence_cost(z):
     xp = chainer.cuda.get_array_module(z[0])
-    return xp.stack([xp.linalg.norm(zi[:-1] - zi[1:]) for zi in z])
+    z = [zi.astype(np.float32) for zi in z]
+    return xp.stack([xp.sum(xp.abs(zi[:-1] - zi[1:])) for zi in z])
 
 
 def sequence_embed(embed, xs, dropout=0.):
@@ -65,7 +66,7 @@ class RationalizedRegressor(chainer.Chain):
             self.generator = generator
 
     def __call__(self, xs, ys):
-        pred, z = self.forward(xs)
+        pred, _, z = self.forward(xs)
         loss = self.calc_loss(pred, z, ys)[0]
         return F.sum(loss)
 
@@ -74,7 +75,7 @@ class RationalizedRegressor(chainer.Chain):
 
         Args:
             pred (chainer.Variable): Predicted score
-            z (list of chianer.Variable):
+            z (list of numpy.ndarray):
             ys (chainer.Variable): Ground truth score
 
         Returns:
@@ -87,17 +88,16 @@ class RationalizedRegressor(chainer.Chain):
         reporter.report({'encoder/loss': xp.sum(loss_encoder.data)}, self)
 
         # calculate loss for generator
-        z_data = [zi.data for zi in z]
-        sparsity = sparsity_cost(z_data)
+        sparsity = sparsity_cost(z)
         reporter.report({'generator/sparsity_cost': xp.sum(sparsity)}, self)
-        coherence = coherence_cost(z_data)
+        coherence = coherence_cost(z)
         reporter.report({'generator/conherence_cost': xp.sum(coherence)}, self)
         regressor_cost = loss_encoder.data
         reporter.report({'generator/regressor_cost': xp.sum(regressor_cost)}, self)
         cost = (regressor_cost +
                 self.sparsity_coef * sparsity +
                 self.coherent_coef * coherence)
-        gen_prob = F.stack([F.prod(zi) for zi in z])
+        gen_prob = F.stack([F.prod(zi.astype(np.float32)) for zi in z])
         loss_generator = cost * gen_prob
         reporter.report({'generator/cost': xp.sum(cost)}, self)
         reporter.report({'generator/loss': xp.sum(loss_generator.data)}, self)
@@ -115,52 +115,59 @@ class RationalizedRegressor(chainer.Chain):
         z = self.generator(exs)
         if xp.isnan(xp.sum(xp.stack([xp.sum(zi.data) for zi in z]))):
             raise ValueError("NaN detected in forward operation of generator")
-        exs_selected = self.select_tokens(exs, z)
+        z_selected = self._sample(z)
+        exs_selected = [ex[zi] for ex, zi in zip(exs, z_selected)]
         y = self.encoder(exs_selected)
         if xp.isnan(xp.sum(y.data)):
             raise ValueError("NaN detected in forward operation of encoder")
-        return y, z
+        return y, z, z_selected
 
-    def _sample_prob(self, xi, zi):
+    def _sample_prob(self, zi):
+        """
+        sample from binomial distribution regarding z as probability
+
+        Args:
+            zi:
+
+        Returns:
+
+        """
         selection = self.xp.array([False])
         # sample for as many as needed to get at least one token
         while not self.xp.any(selection):
-            selection = self.xp.random.rand(*zi.shape) < zi.data
-        return xi[selection]
+            selection = self.xp.random.rand(*zi.shape) < zi
+        return selection
 
-    def _sample_deterministic(self, xi, zi):
-        selection = 0.5 < zi.data
+    def _sample_deterministic(self, zi):
+        selection = 0.5 < zi
         if not self.xp.any(selection):
-            return xi[np.argmax(zi.data):np.argmax(zi.data) + 1]
+            selection = np.zeros_like(zi)
+            selection[np.argmax(zi):np.argmax(zi) + 1] = 1.
+            return selection
         else:
-            return xi[selection]
+            return selection
 
-    def select_tokens(self, x, z):
+    def _sample(self, z):
         """
 
         Args:
-            x (list of Variable): Each variable is of shape (sequence, features)
             z (list of Variable): Each variable is of shape (sequence, 1)
 
         Returns:
             list of numpy.ndarray or cupy.ndarray
 
         """
-        if chainer.config.train:
-            # sample from binomial distribution regarding z as probability
-            y = [self._sample_prob(xi, zi) for xi, zi in zip(x, z)]
-        else:
-            y = [self._sample_deterministic(xi, zi) for xi, zi in zip(x, z)]
-        return y
+        sample_func = self._sample_prob if chainer.config.train else self._sample_deterministic
+        return [sample_func(zi.data) for zi in z]
 
     def predict(self, xs):
-        y, z = self.forward(xs)
-        return y.data, [zi.data for zi in z]
+        y, _, z = self.forward(xs)
+        return y.data, z
 
     def predict_class(self, xs):
-        y, _ = self.forward(xs)
+        y, _, _ = self.forward(xs)
         return y.data
 
     def predict_rationale(self, xs):
-        _, z = self.forward(xs)
-        return [zi.data for zi in z]
+        _, _, z = self.forward(xs)
+        return z
