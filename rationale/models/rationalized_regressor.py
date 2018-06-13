@@ -94,9 +94,10 @@ class RationalizedRegressor(chainer.Chain):
         reporter.report({'generator/conherence_cost': xp.average(coherence)}, self)
         regressor_cost = loss_encoder.data
         reporter.report({'generator/regressor_cost': xp.average(regressor_cost)}, self)
+        # sparsity_coef * coherent_coef to be consistent with original impl.
         cost = (regressor_cost +
                 self.sparsity_coef * sparsity +
-                self.coherent_coef * coherence)
+                self.sparsity_coef * self.coherent_coef * coherence)
         logpz = - F.stack(
             [F.sum(zi * F.log(p) + (1. - zi) * F.log(1. - p))
              for zi, p in zip(z, z_prob)]

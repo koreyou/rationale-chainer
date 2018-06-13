@@ -42,7 +42,8 @@ logger = logging.getLogger(__name__)
 @click.option('--sparsity-coef', type=float, default=0.0003,
               help='Sparsity cost coefficient lambda_1')
 @click.option('--coherent-coef', type=float, default=2.0,
-              help='Coherence cost coefficient lambda_2')
+              help='Coherence cost coefficient lambda_2 against sparsity cost '
+                   'coefficient, i.e. lambda_2 / lambda_1')
 @click.option('--fix_embedding', type=bool, default=False,
               help='Fix word embedding during training')
 @click.option('--resume', '-r', default='',
