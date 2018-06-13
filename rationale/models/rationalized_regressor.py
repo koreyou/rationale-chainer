@@ -66,11 +66,11 @@ class RationalizedRegressor(chainer.Chain):
             self.generator = generator
 
     def __call__(self, xs, ys):
-        pred, _, z = self.forward(xs)
-        loss = self.calc_loss(pred, z, ys)[0]
+        pred, z_prob, z = self.forward(xs)
+        loss = self.calc_loss(pred, z, z_prob, ys)[0]
         return F.sum(loss)
 
-    def calc_loss(self, pred, z, ys):
+    def calc_loss(self, pred, z, z_prob, ys):
         """
 
         Args:
@@ -97,8 +97,11 @@ class RationalizedRegressor(chainer.Chain):
         cost = (regressor_cost +
                 self.sparsity_coef * sparsity +
                 self.coherent_coef * coherence)
-        gen_prob = F.stack([F.prod(zi.astype(np.float32)) for zi in z])
-        loss_generator = cost * gen_prob
+        logpz = - F.stack(
+            [F.sum(zi * F.log(p) + (1. - zi) * F.log(1. - p))
+             for zi, p in zip(z, z_prob)]
+        )
+        loss_generator = cost * logpz
         reporter.report({'generator/cost': xp.sum(cost)}, self)
         reporter.report({'generator/loss': xp.sum(loss_generator.data)}, self)
 
