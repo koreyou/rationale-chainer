@@ -37,7 +37,7 @@ logger = logging.getLogger(__name__)
 @click.option('--test', '-o', default=None, type=click.Path(exists=True))
 @click.option('--batchsize', '-b', type=int, default=256,
               help='Number of images in each mini-batch')
-@click.option('--lr', type=float, default=0.0005,
+@click.option('--lr', type=float, default=0.005,
               help='Unnormalized learning rate to batch size')
 @click.option('--sparsity-coef', type=float, default=0.0003,
               help='Sparsity cost coefficient lambda_1')
@@ -83,7 +83,7 @@ def run(aspect, train, word2vec, epoch, frequency, gpu, out, test, batchsize,
     optimizer = chainer.optimizers.Adam(alpha=lr / batchsize)
     optimizer.setup(model)
     optimizer.add_hook(chainer.optimizer.GradientClipping(3.0))
-    l2_reg = 1e-6
+    l2_reg = 1e-7
     # Impl. by author implements Weight decay as L2 loss, thus multiplying it
     # by the learning rate. Let's implement it that way.
     optimizer.add_hook(chainer.optimizer.WeightDecay(l2_reg * lr))

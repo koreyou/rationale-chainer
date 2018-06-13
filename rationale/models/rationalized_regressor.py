@@ -68,7 +68,7 @@ class RationalizedRegressor(chainer.Chain):
     def __call__(self, xs, ys):
         pred, z_prob, z = self.forward(xs)
         loss = self.calc_loss(pred, z, z_prob, ys)[0]
-        return F.sum(loss)
+        return F.average(loss)
 
     def calc_loss(self, pred, z, z_prob, ys):
         """
@@ -85,15 +85,15 @@ class RationalizedRegressor(chainer.Chain):
 
         # calculate loss for encoder
         loss_encoder = (pred - ys) ** 2
-        reporter.report({'encoder/loss': xp.sum(loss_encoder.data)}, self)
+        reporter.report({'encoder/loss': xp.average(loss_encoder.data)}, self)
 
         # calculate loss for generator
         sparsity = sparsity_cost(z)
-        reporter.report({'generator/sparsity_cost': xp.sum(sparsity)}, self)
+        reporter.report({'generator/sparsity_cost': xp.average(sparsity)}, self)
         coherence = coherence_cost(z)
-        reporter.report({'generator/conherence_cost': xp.sum(coherence)}, self)
+        reporter.report({'generator/conherence_cost': xp.average(coherence)}, self)
         regressor_cost = loss_encoder.data
-        reporter.report({'generator/regressor_cost': xp.sum(regressor_cost)}, self)
+        reporter.report({'generator/regressor_cost': xp.average(regressor_cost)}, self)
         cost = (regressor_cost +
                 self.sparsity_coef * sparsity +
                 self.coherent_coef * coherence)
@@ -102,11 +102,11 @@ class RationalizedRegressor(chainer.Chain):
              for zi, p in zip(z, z_prob)]
         )
         loss_generator = cost * logpz
-        reporter.report({'generator/cost': xp.sum(cost)}, self)
-        reporter.report({'generator/loss': xp.sum(loss_generator.data)}, self)
+        reporter.report({'generator/cost': xp.average(cost)}, self)
+        reporter.report({'generator/loss': xp.average(loss_generator.data)}, self)
 
         loss = loss_encoder + loss_generator
-        reporter.report({'loss': xp.sum(loss.data)}, self)
+        reporter.report({'loss': xp.average(loss.data)}, self)
         return loss, loss_encoder, sparsity, coherence, regressor_cost, loss_generator
 
     def forward(self, xs):
