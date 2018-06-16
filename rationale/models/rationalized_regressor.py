@@ -117,13 +117,9 @@ class RationalizedRegressor(chainer.Chain):
             for i in six.moves.xrange(len(exs)):
                 exs[i].unchain_backward()
         z = self.generator(exs)
-        if xp.isnan(xp.sum(xp.stack([xp.sum(zi.data) for zi in z]))):
-            raise ValueError("NaN detected in forward operation of generator")
         z_selected = self._sample(z)
         exs_selected = [ex[zi.astype(bool)] for ex, zi in zip(exs, z_selected)]
         y = self.encoder(exs_selected)
-        if xp.isnan(xp.sum(y.data)):
-            raise ValueError("NaN detected in forward operation of encoder")
         return y, z, z_selected
 
     def _sample_prob(self, zi):
