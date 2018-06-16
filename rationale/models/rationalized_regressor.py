@@ -91,7 +91,7 @@ class RationalizedRegressor(chainer.Chain):
         sparsity = sparsity_cost(z)
         reporter.report({'generator/sparsity_cost': xp.mean(sparsity)}, self)
         coherence = coherence_cost(z)
-        reporter.report({'generator/conherence_cost': xp.mean(coherence)}, self)
+        reporter.report({'generator/coherence_cost': xp.mean(coherence)}, self)
         regressor_cost = loss_encoder.data
         reporter.report({'generator/regressor_cost': xp.mean(regressor_cost)}, self)
         # sparsity_coef * coherent_coef to be consistent with original impl.
