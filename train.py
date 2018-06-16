@@ -15,7 +15,6 @@ from joblib import Memory
 
 import rationale
 from rationale.dataset import prepare_data
-from rationale.training import SaveRestore, EarlyStoppingTrigger
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -96,10 +95,7 @@ def run(aspect, train, word2vec, epoch, frequency, gpu, out, test, batchsize,
         train_iter, optimizer, device=gpu,
         converter=rationale.training.convert)
 
-    # Set up dev dataset
-    stop_trigger = EarlyStoppingTrigger(
-        monitor='validation/main/loss', max_trigger=(epoch, 'epoch'))
-    trainer = training.Trainer(updater, stop_trigger, out=out)
+    trainer = training.Trainer(updater, (epoch, 'epoch'), out=out)
 
     logger.info("train: {},  dev: {}".format(
         len(train_dataset), len(dev_dataset)))
@@ -126,13 +122,6 @@ def run(aspect, train, word2vec, epoch, frequency, gpu, out, test, batchsize,
 
     trainer.extend(monitor_rationale, trigger=(10, 'iteration'))
 
-    # This works together with EarlyStoppingTrigger to provide more reliable
-    # early stopping
-    trainer.extend(
-        SaveRestore(),
-        trigger=chainer.training.triggers.MinValueTrigger(
-            'validation/main/loss'))
-
     # Take a snapshot for each specified epoch
     if gpu < 0:
         # ParameterStatistics does not work with GPU as of chainer 2.x
@@ -143,8 +132,9 @@ def run(aspect, train, word2vec, epoch, frequency, gpu, out, test, batchsize,
     # Write a log of evaluation statistics for each iteration
     trainer.extend(extensions.LogReport(trigger=(1, 'iteration')), priority=98)
     trainer.extend(extensions.PrintReport(
-        ['epoch', 'main/loss', 'validation/main/loss', 'main/accuracy',
-         'validation/main/accuracy']), trigger=frequency, priority=97)
+        ['epoch', 'main/encoder/mse', 'main/generator/cost',
+         'validation/encoder/mse', 'validation/generator/cost']),
+        trigger=frequency, priority=97)
 
     if resume:
         # Resume from a snapshot

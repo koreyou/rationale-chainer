@@ -85,7 +85,7 @@ class RationalizedRegressor(chainer.Chain):
 
         # calculate loss for encoder
         loss_encoder = (pred - ys) ** 2
-        reporter.report({'encoder/loss': xp.average(loss_encoder.data)}, self)
+        reporter.report({'encoder/mse': xp.average(loss_encoder.data)}, self)
 
         # calculate loss for generator
         sparsity = sparsity_cost(z)
@@ -98,17 +98,17 @@ class RationalizedRegressor(chainer.Chain):
         cost = (regressor_cost +
                 self.sparsity_coef * sparsity +
                 self.sparsity_coef * self.coherent_coef * coherence)
-        logpz = - F.stack(
+        logpz = F.stack(
             [F.sum(zi * F.log(p) + (1. - zi) * F.log(1. - p))
              for zi, p in zip(z, z_prob)]
         )
-        loss_generator = cost * logpz
+        # sampled_gradient is negative value, because it is not a loss
+        sampled_gradient = cost * logpz
         reporter.report({'generator/cost': xp.average(cost)}, self)
-        reporter.report({'generator/loss': xp.average(loss_generator.data)}, self)
+        reporter.report({'generator/sampled_gradient': xp.average(sampled_gradient.data)}, self)
 
-        loss = loss_encoder + loss_generator
-        reporter.report({'loss': xp.average(loss.data)}, self)
-        return loss, loss_encoder, sparsity, coherence, regressor_cost, loss_generator
+        loss = loss_encoder + sampled_gradient
+        return loss, loss_encoder, sparsity, coherence, regressor_cost, sampled_gradient
 
     def forward(self, xs):
         xp = self.xp
