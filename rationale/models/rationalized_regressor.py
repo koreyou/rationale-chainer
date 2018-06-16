@@ -85,15 +85,15 @@ class RationalizedRegressor(chainer.Chain):
 
         # calculate loss for encoder
         loss_encoder = (pred - ys) ** 2
-        reporter.report({'encoder/mse': xp.average(loss_encoder.data)}, self)
+        reporter.report({'encoder/mse': xp.mean(loss_encoder.data)}, self)
 
         # calculate loss for generator
         sparsity = sparsity_cost(z)
-        reporter.report({'generator/sparsity_cost': xp.average(sparsity)}, self)
+        reporter.report({'generator/sparsity_cost': xp.mean(sparsity)}, self)
         coherence = coherence_cost(z)
-        reporter.report({'generator/conherence_cost': xp.average(coherence)}, self)
+        reporter.report({'generator/conherence_cost': xp.mean(coherence)}, self)
         regressor_cost = loss_encoder.data
-        reporter.report({'generator/regressor_cost': xp.average(regressor_cost)}, self)
+        reporter.report({'generator/regressor_cost': xp.mean(regressor_cost)}, self)
         # sparsity_coef * coherent_coef to be consistent with original impl.
         cost = (regressor_cost +
                 self.sparsity_coef * sparsity +
@@ -104,8 +104,8 @@ class RationalizedRegressor(chainer.Chain):
         )
         # sampled_gradient is negative value, because it is not a loss
         sampled_gradient = cost * logpz
-        reporter.report({'generator/cost': xp.average(cost)}, self)
-        reporter.report({'generator/sampled_gradient': xp.average(sampled_gradient.data)}, self)
+        reporter.report({'generator/cost': xp.mean(cost)}, self)
+        reporter.report({'generator/sampled_gradient': xp.mean(sampled_gradient.data)}, self)
 
         loss = loss_encoder + sampled_gradient
         return loss, loss_encoder, sparsity, coherence, regressor_cost, sampled_gradient
@@ -120,7 +120,7 @@ class RationalizedRegressor(chainer.Chain):
         if xp.isnan(xp.sum(xp.stack([xp.sum(zi.data) for zi in z]))):
             raise ValueError("NaN detected in forward operation of generator")
         z_selected = self._sample(z)
-        exs_selected = [ex[zi] for ex, zi in zip(exs, z_selected)]
+        exs_selected = [ex[zi.astype(bool)] for ex, zi in zip(exs, z_selected)]
         y = self.encoder(exs_selected)
         if xp.isnan(xp.sum(y.data)):
             raise ValueError("NaN detected in forward operation of encoder")
@@ -145,8 +145,8 @@ class RationalizedRegressor(chainer.Chain):
     def _sample_deterministic(self, zi):
         selection = 0.5 < zi
         if not self.xp.any(selection):
-            selection = np.zeros_like(zi)
-            selection[np.argmax(zi):np.argmax(zi) + 1] = 1.
+            selection = self.xp.zeros_like(zi)
+            selection[self.xp.argmax(zi):self.xp.argmax(zi) + 1] = 1.
             return selection
         else:
             return selection
