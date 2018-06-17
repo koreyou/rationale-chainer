@@ -76,17 +76,15 @@ def evaluate_rationale(model, dataset, device=-1, batchsize=128):
     for batch in it:
         in_arrays = convert(batch, device)
         with chainer.function.no_backprop_mode(), using_config('train', False):
-            y, z = model.forward(in_arrays['xs'])
-            _, _, _, _, regressor_cost, _ = \
-                model.calc_loss(y, z, in_arrays['ys'])
+            pred, z_prob, z = model.forward(in_arrays['xs'])
+            regressor_cost = model.calc_loss(pred, z, z_prob, in_arrays['ys'])[4]
         regressor_cost = to_cpu(regressor_cost)
-        z = [to_cpu(zi.data).tolist() for zi in z]
+        z = [to_cpu(zi).tolist() for zi in z]
 
         tot_mse += regressor_cost.sum()
 
         for bi, zi in zip(batch, z):
             true_z_interval = bi['intervals']
-            zi = [1 if zij > 0.5 else 0 for zij in zi]
             nzi = sum(zi)
             tp = sum(
                 1 for i, zij in enumerate(zi)
