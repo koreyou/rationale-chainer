@@ -45,7 +45,7 @@ def run(aspect, word2vec, trained_model, gpu, test, out, batchsize,
         w2v.shape[1], 1, 300,
     )
     generator = rationale.models.LSTMGenerator(
-        w2v.shape[1], 2, 300, dropout=0.1
+        w2v.shape[1], 1, 300, dropout=0.1
     )
     model = rationale.models.RationalizedRegressor(
         generator, encoder, w2v.shape[0], w2v.shape[1], initialEmb=w2v,
