@@ -118,8 +118,8 @@ class RationalizedRegressor(chainer.Chain):
                 exs[i].unchain_backward()
         z = self.generator(exs)
         z_selected = self._sample(z)
-        selected_ratio = (xp.sum([xp.sum(zi) for zi in z_selected])
-                          / xp.sum([len(zi) for zi in z_selected]))
+        selected_ratio = (xp.sum(xp.stack([xp.sum(zi) for zi in z_selected]))
+                          / xp.sum(xp.array([len(zi) for zi in z_selected])))
         reporter.report({'generator/selected_ratio': selected_ratio}, self)
         exs_selected = [ex[zi.astype(bool)] for ex, zi in zip(exs, z_selected)]
         y = self.encoder(exs_selected)
