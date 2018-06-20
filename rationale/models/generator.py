@@ -9,8 +9,8 @@ class LSTMGenerator(chainer.Chain):
         self.dropout_fc = dropout_fc
         self.out_units = n_units
         with self.init_scope():
-            self.encoder = L.NStepLSTM(n_layers, in_size, n_units, dropout)
-            self.l1 = L.Linear(n_units, 1)
+            self.encoder = L.NStepBiLSTM(n_layers, in_size, n_units, dropout)
+            self.l1 = L.Linear(n_units * 2, 1)
 
     def __call__(self, x):
         # o: list of array of shape (sequence size, feature size)
