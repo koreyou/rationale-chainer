@@ -30,8 +30,10 @@ logger = logging.getLogger(__name__)
               help='Sparsity cost coefficient lambda_1')
 @click.option('--coherent-coef', type=float, default=2.0,
               help='Coherence cost coefficient lambda_2')
+@click.option('--order', type=int, default=2,
+              help='Order of RCNN')
 def run(aspect, word2vec, trained_model, gpu, test, out, batchsize,
-        sparsity_coef, coherent_coef):
+        sparsity_coef, coherent_coef, order):
     """
     Train "Rationalizing Neural Predictions" for one specified aspect.
 
@@ -41,11 +43,12 @@ def run(aspect, word2vec, trained_model, gpu, test, out, batchsize,
     w2v, vocab, _, _, test_dataset = \
         memory.cache(prepare_data)(None, word2vec, aspect, annotation=test)
 
-    encoder = rationale.models.LSTMEncoder(
-        w2v.shape[1], 1, 300,
+    encoder = rationale.models.Encoder(
+        w2v.shape[1], order, 200, 2, dropout=0.1
     )
-    generator = rationale.models.LSTMGenerator(
-        w2v.shape[1], 1, 300, dropout=0.1
+    # Original impl. uses two layers to model bi-directional LSTM
+    generator = rationale.models.Generator(
+        w2v.shape[1], order, 200, dropout=0.1
     )
     model = rationale.models.RationalizedRegressor(
         generator, encoder, w2v.shape[0], w2v.shape[1], initialEmb=w2v,

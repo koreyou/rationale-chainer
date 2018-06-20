@@ -2,52 +2,41 @@ import chainer
 import chainer.functions as F
 import chainer.links as L
 
+from rationale.models.rcnn import BiRCNN
 
-class BiLSTM(chainer.Chain):
 
-    """A modified LSTM-RNN that used in Tao et al.
-
-    Args:
-        n_layers (int): The number of LSTM layers.
-        n_units (int): The number of units of a LSTM layer and word embedding.
-        dropout (float): The dropout ratio.
-        use_all (bool): Whether to use outputs of all layers (by concatenating
-            them all) or just the last layer.
-    """
-    def __init__(self, in_size, n_layers, n_units, dropout=0.1, use_all=True):
-        super(BiLSTM, self).__init__()
+class NStepBiRCNN(chainer.Chain):
+    def __init__(self, n_in, n_out, order, n_layer, dropout=0.1):
+        super(NStepBiRCNN, self).__init__()
+        self.dropout = dropout
+        self.n_layer = n_layer
         with self.init_scope():
-            self.use_all = use_all
-            self.encoder = L.NStepBiLSTM(n_layers, in_size, n_units, dropout)
+            self.encoder0 = BiRCNN(n_in, n_out, order)
+        for i in range(1, n_layer):
+            self.add_link("encoder%d" % i, BiRCNN(n_out * 2, n_out, order))
 
-    def __call__(self, exs):
-        # last h has shape (2 * n_layers, batch size, n_units)
-        last_h, _, _ = self.encoder(None, None, exs)
-        if self.use_all:
-            concat_outputs = last_h
-        else:
-            concat_outputs = last_h[-2:]
-        concat_outputs = F.swapaxes(concat_outputs, 0, 1)
-        concat_outputs = F.reshape(concat_outputs, (concat_outputs.shape[0], -1))
-        return concat_outputs
+    def __call__(self, x):
+        last_hs = []
+        for i in range(self.n_layer):
+            if self.dropout > 0.:
+                x = [F.dropout(xi, self.dropout) for xi in x]
+            encoder = getattr(self, "encoder%d" % i)
+            x, _ = encoder(x)
+            last_hs.append(F.stack([xi[-1] for xi in x]))
+        return F.hstack(last_hs)
 
 
-class LSTMEncoder(chainer.Chain):
-
-    def __init__(self, in_size, n_layers, n_units, dropout_rnn=0.1,
-                 dropout_fc=0.1, use_all=True):
-        super(LSTMEncoder, self).__init__()
-        self.dropout_fc = dropout_fc
-        if use_all:
-            fc_units = n_layers * n_units * 2
-        else:
-            fc_units = n_units * 2
+class Encoder(chainer.Chain):
+    def __init__(self, in_size, order, n_units, n_layer, dropout=0.1):
+        super(Encoder, self).__init__()
+        self.dropout = dropout
         with self.init_scope():
-            self.encoder = BiLSTM(in_size, n_layers, n_units, dropout_rnn)
-            self.l1 = L.Linear(fc_units, 1)
+            self.encoder = NStepBiRCNN(
+                in_size, n_units, order, n_layer, dropout=dropout)
+            self.l1 = L.Linear(n_layer * n_units * 2, 1)
 
     def __call__(self, x):
         o = self.encoder(x)
-        if self.dropout_fc > 0.:
-            o = F.dropout(o, self.dropout_fc)
+        if self.dropout > 0.:
+            o = F.dropout(o, self.dropout)
         return F.sigmoid(F.squeeze(self.l1(o), 1))
