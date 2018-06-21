@@ -5,12 +5,14 @@ import numpy as np
 import six
 from chainer import reporter
 
+
 embed_init = chainer.initializers.Uniform(.25)
 
 
 def sparsity_cost(z):
     xp = chainer.cuda.get_array_module(z[0])
     return xp.stack([xp.sum(zi) for zi in z])
+
 
 def coherence_cost(z):
     xp = chainer.cuda.get_array_module(z[0])
@@ -116,52 +118,11 @@ class RationalizedRegressor(chainer.Chain):
         if self.fix_embedding:
             for i in six.moves.xrange(len(exs)):
                 exs[i].unchain_backward()
-        z = self.generator(exs)
-        z_selected = self._sample(z)
-        selected_ratio = (xp.sum(xp.stack([xp.sum(zi) for zi in z_selected]))
-                          / xp.sum(xp.array([len(zi) for zi in z_selected])))
-        reporter.report({'generator/selected_ratio': selected_ratio}, self)
-        exs_selected = [ex[zi.astype(bool)] for ex, zi in zip(exs, z_selected)]
+        pz, z = self.generator(exs)
+
+        exs_selected = [ex[zi.astype(bool)] for ex, zi in zip(exs, z)]
         y = self.encoder(exs_selected)
-        return y, z, z_selected
-
-    def _sample_prob(self, zi):
-        """
-        sample from binomial distribution regarding z as probability
-
-        Args:
-            zi:
-
-        Returns:
-
-        """
-        selection = self.xp.array([False])
-        # sample for as many as needed to get at least one token
-        while not self.xp.any(selection):
-            selection = self.xp.random.rand(*zi.shape) < zi
-        return selection
-
-    def _sample_deterministic(self, zi):
-        selection = 0.5 < zi
-        if not self.xp.any(selection):
-            selection = self.xp.zeros_like(zi)
-            selection[self.xp.argmax(zi):self.xp.argmax(zi) + 1] = 1.
-            return selection
-        else:
-            return selection
-
-    def _sample(self, z):
-        """
-
-        Args:
-            z (list of Variable): Each variable is of shape (sequence, 1)
-
-        Returns:
-            list of numpy.ndarray or cupy.ndarray
-
-        """
-        sample_func = self._sample_prob if chainer.config.train else self._sample_deterministic
-        return [sample_func(zi.data) for zi in z]
+        return y, pz, z
 
     def predict(self, xs):
         y, _, z = self.forward(xs)
