@@ -4,3 +4,4 @@ dill
 joblib
 numpy==1.14.2
 six
+WordEmbeddingLoader==0.2.1
