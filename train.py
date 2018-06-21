@@ -45,12 +45,16 @@ logger = logging.getLogger(__name__)
                    'coefficient, i.e. lambda_2 / lambda_1')
 @click.option('--fix_embedding', type=bool, default=False,
               help='Fix word embedding during training')
+@click.option('--dependent', is_flag=True,
+              help='Use a variation of the generator that are dependent on'
+                   'previously sampled tokens')
 @click.option('--order', type=int, default=2,
               help='Order of RCNN')
 @click.option('--resume', '-r', default='',
               help='Resume the training from snapshot')
 def run(aspect, train, word2vec, epoch, frequency, gpu, out, test, batchsize,
-        lr, sparsity_coef, coherent_coef, fix_embedding, order, resume):
+        lr, sparsity_coef, coherent_coef, fix_embedding, dependent, order,
+        resume):
     """
     Train "Rationalizing Neural Predictions" for one specified aspect.
 
@@ -65,10 +69,10 @@ def run(aspect, train, word2vec, epoch, frequency, gpu, out, test, batchsize,
     encoder = rationale.models.Encoder(
         w2v.shape[1], order, 200, 2, dropout=0.1
     )
+    generator_cls = (rationale.models.GeneratorDependent
+                     if dependent else rationale.models.Generator)
     # Original impl. uses two layers to model bi-directional LSTM
-    generator = rationale.models.Generator(
-        w2v.shape[1], order, 200, dropout=0.1
-    )
+    generator = generator_cls(w2v.shape[1], order, 200, dropout=0.1)
     model = rationale.models.RationalizedRegressor(
         generator, encoder, w2v.shape[0], w2v.shape[1], initialEmb=w2v,
         dropout_emb=0.1, fix_embedding=fix_embedding,

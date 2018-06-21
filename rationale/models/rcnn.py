@@ -24,7 +24,7 @@ class RCNN(chainer.Chain):
                 shape=(n_in, n_out),
                 initializer=chainer.initializers.Uniform(0.05))
 
-    def _forward_single(self, x, h, c):
+    def forward_single(self, x, h, c):
         """ forward one time step
 
         Args:
@@ -86,7 +86,7 @@ class RCNN(chainer.Chain):
                 # a sequence ended
                 h = h[:len(x)]
                 c = [c_i[:len(x)] for c_i in c]
-            h, c = self._forward_single(x, h, c)
+            h, c = self.forward_single(x, h, c)
             c_lst.append(F.hstack(c))
             h_lst.append(h)
 
@@ -103,6 +103,7 @@ class RCNN(chainer.Chain):
 class BiRCNN(chainer.Chain):
     def __init__(self, n_in, n_out, order):
         super(BiRCNN, self).__init__()
+        self.n_out = n_out * 2
         with self.init_scope():
             self.fw = RCNN(n_in, n_out, order)
             self.bw = RCNN(n_in, n_out, order)

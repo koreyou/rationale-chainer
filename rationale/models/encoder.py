@@ -15,14 +15,36 @@ class NStepBiRCNN(chainer.Chain):
         for i in range(1, n_layer):
             self.add_link("encoder%d" % i, BiRCNN(n_out * 2, n_out, order))
 
+    def _stack_and_fill(self, x, is_empty, feat_size):
+        out = []
+        x_cnt = 0
+        for i in range(len(is_empty)):
+            if is_empty[i]:
+                out.append(self.xp.zeros([feat_size], self.xp.float32))
+            else:
+                out.append(x[x_cnt][-1])
+                x_cnt += 1
+        assert (len(is_empty) - sum(is_empty)) == x_cnt
+        return out
+
     def __call__(self, x):
         last_hs = []
+        # Generator may extract 0 token from the input, which causes an error
+        # so only input non-zero length sequences to RCNN and fill those that
+        # are empty
+        is_empty = [len(xi) == 0 for xi in x]
+        x = [x[i] for i in range(len(x)) if not is_empty[i]]
+        if len(x) == 0:
+            # all input is empty!
+            shape = [len(is_empty), self.encoder0.n_out * self.n_layer]
+            return chainer.Variable(self.xp.zeros(shape, self.xp.float32))
         for i in range(self.n_layer):
             if self.dropout > 0.:
                 x = [F.dropout(xi, self.dropout) for xi in x]
             encoder = getattr(self, "encoder%d" % i)
             x, _ = encoder(x)
-            last_hs.append(F.stack([xi[-1] for xi in x]))
+            last_hs.append(
+                F.stack(self._stack_and_fill(x, is_empty, encoder.n_out)))
         return F.hstack(last_hs)
 
 
