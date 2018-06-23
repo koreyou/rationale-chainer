@@ -15,6 +15,7 @@ from joblib import Memory
 
 import rationale
 from rationale.dataset import prepare_data
+from rationale.training import SaveRestore
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -127,7 +128,13 @@ def run(aspect, train, word2vec, epoch, frequency, gpu, out, batchsize,
 
     trainer.extend(monitor_rationale, trigger=(10, 'iteration'))
 
-    # Take a snapshot for each specified epoch
+    # This works together with EarlyStoppingTrigger to provide more reliable
+    # early stopping
+    trainer.extend(
+        SaveRestore(filename=os.path.join(out, 'trainer.npz')),
+        trigger = chainer.training.triggers.MinValueTrigger(
+        'validation/generator/cost'))
+
     if gpu < 0:
         # ParameterStatistics does not work with GPU as of chainer 2.x
         # https://github.com/chainer/chainer/issues/3027
