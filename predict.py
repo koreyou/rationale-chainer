@@ -45,10 +45,10 @@ def run(aspect, word2vec, trained_model, gpu, out, test, batchsize,
     Please refer README.md for details.
     """
     memory = Memory(cachedir='.', verbose=1)
-    if os.path.extsep(test)[-1] == '.json':
+    if os.path.splitext(test)[-1] == '.json':
         w2v, vocab, _, _, test_dataset = \
             memory.cache(prepare_data)(None, word2vec, aspect, annotation=test)
-    elif os.path.extsep(test)[-1] == '.gz':
+    elif os.path.splitext(test)[-1] == '.gz':
         w2v, vocab, test_dataset, _, _ = \
             memory.cache(prepare_data)(test, word2vec, aspect)
     else:
