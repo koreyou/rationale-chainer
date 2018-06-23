@@ -72,7 +72,8 @@ def evaluate_rationale(model, dataset, device=-1, batchsize=128):
     tot_mse = 0.0
     accum_precision = 0.0  # for calculating macro precision
     true_positives = 0.0  # for calculating micro precision
-    tot_z, tot_n = 1e-10, 1e-10
+    chosen_ratios = 0.0  # for calculating micro precision
+    tot_z, tot_n, tot_t = 1e-10, 1e-10, 1e-10
     for batch in it:
         in_arrays = convert(batch, device)
         with chainer.function.no_backprop_mode(), using_config('train', False):
@@ -86,19 +87,25 @@ def evaluate_rationale(model, dataset, device=-1, batchsize=128):
         for bi, zi in zip(batch, z):
             true_z_interval = bi['intervals']
             nzi = sum(zi)
+            nti = sum([(u[1] - u[0] + 1) for u in true_z_interval])
             tp = sum(
                 1 for i, zij in enumerate(zi)
                 if (zij and any(i >= u[0] and i < u[1] for u in true_z_interval)))
             if nzi == 0:
                 # precision is undefined when there is 0 prediction
                 continue
-            accum_precision += tp / nzi
+            accum_precision += tp / float(nzi)
             tot_n += 1
             true_positives += tp
             tot_z += nzi
+            chosen_ratios = nzi / float(nti)
+            tot_t += nti
+
     result = {
         "mse": tot_mse/len(dataset),
-        "macro_precision": accum_precision/tot_n,
-        "micro_precision": true_positives/tot_z,
+        "macro_precision": accum_precision / tot_n,
+        "micro_precision": true_positives / tot_z,
+        "micro_chosen_ratio": tot_z / tot_t,
+        "macro_chosen_ratio": chosen_ratios / tot_n,
     }
     return result
