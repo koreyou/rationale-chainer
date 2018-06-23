@@ -8,14 +8,10 @@ import os
 import chainer
 import click
 import dill  # This is for joblib to use dill. Do NOT delete it.
-import numpy as np
-from chainer import training
-from chainer.training import extensions
 from joblib import Memory
 
 import rationale
 from rationale.dataset import prepare_data
-from rationale.training import SaveRestore, EarlyStoppingTrigger
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
