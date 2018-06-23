@@ -49,8 +49,17 @@ def run(aspect, word2vec, trained_model, gpu, out, test, batchsize,
     Please refer README.md for details.
     """
     memory = Memory(cachedir='.', verbose=1)
-    w2v, vocab, test_dataset, _, _ = \
-        memory.cache(prepare_data)(test, word2vec, aspect)
+    if os.path.extsep(test)[-1] == '.json':
+        w2v, vocab, _, _, test_dataset = \
+            memory.cache(prepare_data)(None, word2vec, aspect, annotation=test)
+    elif os.path.extsep(test)[-1] == '.gz':
+        w2v, vocab, test_dataset, _, _ = \
+            memory.cache(prepare_data)(test, word2vec, aspect)
+    else:
+        raise ValueError(
+            "Input 'test' must be either json file or gzipped text file with"
+            " appropriate extension."
+        )
 
     encoder = rationale.models.Encoder(
         w2v.shape[1], order, 200, 2, dropout=0.1
