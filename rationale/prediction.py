@@ -49,7 +49,7 @@ def test(model, dataset, inv_vocab, device=-1, batchsize=128):
 
         results.extend(({
             'x': xs[i],
-            'z': z[i],
+            'z': list(map(int, z[i])),
             'y': y[i],
             'text': [inv_vocab[t] for t in xs[i]],
             'rationale': [inv_vocab[t] if zt > 0.5 else '_'
