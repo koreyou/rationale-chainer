@@ -44,7 +44,7 @@ def test(model, dataset, inv_vocab, device=-1, batchsize=128):
         regressor_cost = to_cpu(regressor_cost)
         loss_generator = to_cpu(loss_generator.data)
         y = to_cpu(y.data).tolist()
-        z = [to_cpu(zi.data).tolist() for zi in z]
+        z = [to_cpu(zi).tolist() for zi in z]
         xs = [to_cpu(xi).tolist() for xi in in_arrays['xs']]
 
         results.extend(({
