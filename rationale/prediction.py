@@ -87,7 +87,6 @@ def evaluate_rationale(model, dataset, device=-1, batchsize=128):
         for bi, zi in zip(batch, z):
             true_z_interval = bi['intervals']
             nzi = sum(zi)
-            nti = sum([(u[1] - u[0] + 1) for u in true_z_interval])
             tp = sum(
                 1 for i, zij in enumerate(zi)
                 if (zij and any(i >= u[0] and i < u[1] for u in true_z_interval)))
@@ -98,8 +97,8 @@ def evaluate_rationale(model, dataset, device=-1, batchsize=128):
             tot_n += 1
             true_positives += tp
             tot_z += nzi
-            chosen_ratios = nzi / float(nti)
-            tot_t += nti
+            chosen_ratios += nzi / float(len(zi))
+            tot_t += len(zi)
 
     result = {
         "mse": tot_mse/len(dataset),
