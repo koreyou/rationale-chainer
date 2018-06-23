@@ -34,9 +34,9 @@ def test(model, dataset, inv_vocab, device=-1, batchsize=128):
     for batch in it:
         in_arrays = convert(batch, device)
         with chainer.function.no_backprop_mode(), using_config('train', False):
-            y, z = model.forward(in_arrays['xs'])
+            y, z_prob, z = model.forward(in_arrays['xs'])
             loss, loss_encoder, sparsity, coherence, regressor_cost, loss_generator = \
-                model.calc_loss(y, z, in_arrays['ys'])
+                model.calc_loss(y, z, z_prob, in_arrays['ys'])
         loss = to_cpu(loss.data)
         loss_encoder = to_cpu(loss_encoder.data)
         sparsity = to_cpu(sparsity)
