@@ -33,7 +33,6 @@ logger = logging.getLogger(__name__)
               help='GPU ID (negative value indicates CPU)')
 @click.option('--out', '-o', default='result',
               help='Directory to output the result and temporaly file')
-@click.option('--test', '-o', default=None, type=click.Path(exists=True))
 @click.option('--batchsize', '-b', type=int, default=256,
               help='Number of images in each mini-batch')
 @click.option('--lr', type=float, default=0.005,
@@ -52,7 +51,7 @@ logger = logging.getLogger(__name__)
               help='Order of RCNN')
 @click.option('--resume', '-r', default='',
               help='Resume the training from snapshot')
-def run(aspect, train, word2vec, epoch, frequency, gpu, out, test, batchsize,
+def run(aspect, train, word2vec, epoch, frequency, gpu, out, batchsize,
         lr, sparsity_coef, coherent_coef, fix_embedding, dependent, order,
         resume):
     """
@@ -61,8 +60,8 @@ def run(aspect, train, word2vec, epoch, frequency, gpu, out, test, batchsize,
     Please refer README.md for details.
     """
     memory = Memory(cachedir='.', verbose=1)
-    w2v, vocab, dataset, test_dataset, _ = \
-        memory.cache(prepare_data)(train, word2vec, aspect, test=test)
+    w2v, vocab, dataset, _, _ = \
+        memory.cache(prepare_data)(train, word2vec, aspect)
     train_dataset, dev_dataset = chainer.datasets.split_dataset(
         dataset, len(dataset) - 500)
 
@@ -153,12 +152,6 @@ def run(aspect, train, word2vec, epoch, frequency, gpu, out, test, batchsize,
     chainer.serializers.save_npz(os.path.join(out, 'trained_model.npz'), model)
     with open(os.path.join(out, 'vocab.json'), 'w') as fout:
         json.dump(vocab, fout)
-
-    if test_dataset is not None:
-        results = rationale.prediction.test(model, test_dataset, inv_vocab,
-                                            device=gpu, batchsize=batchsize)
-        with open(os.path.join(out, 'output.json'), 'w') as fout:
-            json.dump(results, fout)
 
 
 if __name__ == '__main__':
