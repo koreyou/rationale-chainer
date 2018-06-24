@@ -88,7 +88,7 @@ def evaluate_rationale(model, dataset, device=-1, batchsize=128):
         for bi, zi in zip(batch, z):
             true_z = bi['zs']
             nzi = sum(zi)
-            tp = np.logical_and(zi, true_z)
+            tp = np.sum(np.logical_and(zi, true_z))
             if nzi == 0:
                 # precision is undefined when there is 0 prediction
                 continue
