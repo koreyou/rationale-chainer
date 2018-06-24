@@ -36,7 +36,7 @@ class Generator(chainer.Chain):
         z = self._sample(pz)
         selected_ratio = (xp.sum(xp.stack([xp.sum(zi) for zi in z]))
                           / xp.sum(xp.array([len(zi) for zi in z])))
-        reporter.report({'generator/selected_ratio': selected_ratio}, self)
+        reporter.report({'selected_ratio': selected_ratio}, self)
 
         return pz, z
 
@@ -107,6 +107,6 @@ class GeneratorDependent(chainer.Chain):
 
         selected_ratio = (xp.sum(xp.stack([xp.sum(zi) for zi in z]))
                           / xp.sum(xp.array([len(zi) for zi in z])))
-        reporter.report({'generator/selected_ratio': selected_ratio}, self)
+        reporter.report({'selected_ratio': selected_ratio}, self)
 
         return pz, z
