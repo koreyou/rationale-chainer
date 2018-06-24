@@ -131,9 +131,9 @@ def run(aspect, train, word2vec, epoch, frequency, gpu, out, batchsize,
     # This works together with EarlyStoppingTrigger to provide more reliable
     # early stopping
     trainer.extend(
-        SaveRestore(filename=os.path.join(out, 'trainer.npz')),
+        SaveRestore(filename='trainer.npz'),
         trigger = chainer.training.triggers.MinValueTrigger(
-        'validation/generator/cost'))
+        'validation/main/generator/cost'), priority=96)
 
     if gpu < 0:
         # ParameterStatistics does not work with GPU as of chainer 2.x
@@ -145,7 +145,7 @@ def run(aspect, train, word2vec, epoch, frequency, gpu, out, batchsize,
     trainer.extend(extensions.LogReport(trigger=(1, 'iteration')), priority=98)
     trainer.extend(extensions.PrintReport(
         ['epoch', 'main/encoder/mse', 'main/generator/cost',
-         'validation/encoder/mse', 'validation/generator/cost']),
+         'validation/main/encoder/mse', 'validation/main/generator/cost']),
         trigger=frequency, priority=97)
 
     if resume:
