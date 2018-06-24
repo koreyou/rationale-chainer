@@ -56,7 +56,7 @@ def _read_beer_dataset(path, aspect, vocab, max_tokens):
 def _read_annotation(path, aspect, vocab, max_tokens):
     xs = []
     scores = []
-    intervals = []
+    zs = []
     with open(path) as fin:
         for line in fin:
             d = json.loads(line.strip())
@@ -67,7 +67,9 @@ def _read_annotation(path, aspect, vocab, max_tokens):
             s = d['y']
             xs.append(np.array(tokens, np.int32))
             scores.append(s[aspect])
-            intervals.append(d[str(aspect)])
+            zs.append(
+                np.array([any((i >= u[0] and i < u[1] for u in d[str(aspect)]))
+                 for i in range(len(tokens))], np.int32))
 
     return DictDataset(
-        xs=xs, ys=np.array(scores, dtype=np.float32), intervals=intervals)
+        xs=xs, ys=np.array(scores, dtype=np.float32), zs=zs)

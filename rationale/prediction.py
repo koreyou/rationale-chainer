@@ -5,6 +5,7 @@ from __future__ import absolute_import, division, print_function, \
 import logging
 
 import chainer
+import numpy as np
 from chainer.configuration import using_config
 from chainer.cuda import to_cpu
 from chainer.iterators import SerialIterator
@@ -85,11 +86,9 @@ def evaluate_rationale(model, dataset, device=-1, batchsize=128):
         tot_mse += regressor_cost.sum()
 
         for bi, zi in zip(batch, z):
-            true_z_interval = bi['intervals']
+            true_z = bi['zs']
             nzi = sum(zi)
-            tp = sum(
-                1 for i, zij in enumerate(zi)
-                if (zij and any(i >= u[0] and i < u[1] for u in true_z_interval)))
+            tp = np.logical_and(zi, true_z)
             if nzi == 0:
                 # precision is undefined when there is 0 prediction
                 continue
