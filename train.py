@@ -143,7 +143,8 @@ def run(aspect, train, word2vec, epoch, frequency, gpu, out, batchsize,
 
     trainer.extend(
         ConditionalRestart(
-            monitor='main/generator/cost', mode='min', check_trigger=(1, 'iteration'), patients=1))
+            monitor='validation/main/generator/cost', mode='min',
+            check_trigger=(1, 'epoch'), patients=2))
 
 
     if gpu < 0:

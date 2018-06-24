@@ -152,9 +152,7 @@ class ConditionalRestart(chainer.training.extension.Extension):
             for successive ``patient`` checks.
         mode (str) : ``'max'`` or ``'min'``.
             It is used to determine how to compare the monitored values.
-        rewind_iteration (bool): Rewind iteration back to where the model was
-            saved. This is not thoroughly checked and may have unexpected
-            side effects.
+
     """
     priority = 50  # let it have very low priority
 
@@ -162,8 +160,7 @@ class ConditionalRestart(chainer.training.extension.Extension):
             self, monitor='main/loss',
             savefun=chainer.serializers.npz.save_npz,
             loadfun=chainer.serializers.npz.load_npz, onloadfun=None,
-            check_trigger=(1, 'epoch'), patients=3, mode='min',
-            rewind_iteration=False
+            check_trigger=(1, 'epoch'), patients=3, mode='min'
     ):
         super(ConditionalRestart, self).__init__()
         self._savefun = savefun
@@ -171,7 +168,6 @@ class ConditionalRestart(chainer.training.extension.Extension):
         self._onloadfun = onloadfun
         self._saved_iteration = None
         self._filename = 'saverestore' + str(hash(random.random()))
-        self._rewind_iteration = rewind_iteration
 
         if mode == 'max':
             self._compare = operator.gt
@@ -219,8 +215,6 @@ class ConditionalRestart(chainer.training.extension.Extension):
     def _load(self, trainer):
         print('Loading model from %d iteration' % self._saved_iteration)
         self._loadfun(self._saved_path, trainer)
-        if self._rewind_iteration:
-            trainer.updater.iteration = self._saved_iteration
 
     def finalize(self):
         if os.path.exists(self._saved_path):
