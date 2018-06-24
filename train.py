@@ -11,6 +11,7 @@ import dill  # This is for joblib to use dill. Do NOT delete it.
 import numpy as np
 from chainer import training
 from chainer.training import extensions
+import chainer.backends.intel64
 from joblib import Memory
 
 import rationale
@@ -80,9 +81,17 @@ def run(aspect, train, word2vec, epoch, frequency, gpu, out, batchsize,
     )
 
     if gpu >= 0:
+        logger.info('Using GPU (%d)' % gpu)
         # Make a specified GPU current
         chainer.cuda.get_device_from_id(gpu).use()
         model.to_gpu()  # Copy the model to the GPU
+    elif chainer.backends.intel64.is_ideep_available():
+        logger.info('Using CPU with iDeep')
+        # iDeep was able to accelerate training on CPU by about 30% on laptop
+        model.to_intel64()
+        chainer.global_config.use_ideep = 'auto'
+    else:
+        logger.info('Using CPU without acceleration')
 
     # Impl. by author uses mean as loss. Let's divide lr by batchsize to have
     # similar effect
