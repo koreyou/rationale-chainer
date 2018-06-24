@@ -143,10 +143,12 @@ def run(aspect, train, word2vec, epoch, frequency, gpu, out, batchsize,
 
     # Write a log of evaluation statistics for each iteration
     trainer.extend(extensions.LogReport(trigger=(1, 'iteration')), priority=98)
-    trainer.extend(extensions.PrintReport(
-        ['epoch', 'main/encoder/mse', 'main/generator/cost',
-         'validation/main/encoder/mse', 'validation/main/generator/cost']),
-        trigger=frequency, priority=97)
+    trainer.extend(
+        extensions.PrintReport(
+            ['epoch', 'main/encoder/mse', 'main/generator/cost',
+             'validation/main/encoder/mse', 'validation/main/generator/cost'],
+            log_report=extensions.LogReport(trigger=(10, 'iteration'))),
+        trigger=(10, 'iteration'), priority=97)
 
     if resume:
         # Resume from a snapshot
