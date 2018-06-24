@@ -7,14 +7,12 @@ import os
 import random
 import shutil
 import tempfile
-import warnings
 
 import chainer
 import numpy
-import six
 from chainer import cuda
-from chainer import reporter
-from chainer.training import util
+
+from rationale.minmax_value_trigger import MinValueTrigger, MaxValueTrigger
 
 
 def convert(batch, device):
@@ -120,6 +118,15 @@ class SaveRestore(chainer.training.extension.Extension):
             os.remove(self._saved_path)
 
 
+class EarlyStoppingTrigger(chainer.training.triggers.EarlyStoppingTrigger):
+    def __init__(self, *args, **kwargs):
+        super(EarlyStoppingTrigger, self).__init__(*args, **kwargs)
+        def new_trigger(trainer):
+            observation = trainer.observation.keys()
+            return self.monitor in observation
+        self._interval_trigger = new_trigger
+
+
 class ConditionalRestart(chainer.training.extension.Extension):
     """Trainer extension to save a snapshot and restore it when certain condition
     are met.
@@ -160,7 +167,7 @@ class ConditionalRestart(chainer.training.extension.Extension):
             self, monitor='main/loss',
             savefun=chainer.serializers.npz.save_npz,
             loadfun=chainer.serializers.npz.load_npz, onloadfun=None,
-            check_trigger=(1, 'epoch'), patients=3, mode='min'
+            patients=3, mode='min'
     ):
         super(ConditionalRestart, self).__init__()
         self._savefun = savefun
@@ -173,18 +180,16 @@ class ConditionalRestart(chainer.training.extension.Extension):
             self._compare = operator.gt
             # never let max_trigger trigger
             self._load_trigger = chainer.training.triggers.EarlyStoppingTrigger(
-                check_trigger=check_trigger, monitor=monitor, patients=patients,
+                monitor=monitor, patients=patients,
                 mode=mode, max_trigger=(1000000000, 'epoch')
             )
-            self._save_trigger = chainer.training.triggers.MaxValueTrigger(
-                monitor, trigger=check_trigger)
+            self._save_trigger = MaxValueTrigger(monitor)
         elif mode == 'min':
             self._load_trigger = chainer.training.triggers.EarlyStoppingTrigger(
-                check_trigger=check_trigger, monitor=monitor, patients=patients,
+                monitor=monitor, patients=patients,
                 mode=mode, max_trigger=(1000000000, 'epoch')
             )
-            self._save_trigger = chainer.training.triggers.MinValueTrigger(
-                monitor, trigger=check_trigger)
+            self._save_trigger = MinValueTrigger(monitor)
         else:
             raise ValueError('Unknown mode "%s"' % mode)
 

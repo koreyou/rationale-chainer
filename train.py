@@ -17,6 +17,8 @@ from joblib import Memory
 import rationale
 from rationale.dataset import prepare_data
 from rationale.training import SaveRestore, ConditionalRestart
+from rationale.minmax_value_trigger import MinValueTrigger
+
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -138,13 +140,13 @@ def run(aspect, train, word2vec, epoch, frequency, gpu, out, batchsize,
     trainer.extend(monitor_rationale, trigger=(10, 'iteration'))
     trainer.extend(
         SaveRestore(filename='trainer.npz'),
-        trigger = chainer.training.triggers.MinValueTrigger(
-        'validation/main/generator/cost'), priority=96)
+        trigger=MinValueTrigger('validation/main/generator/cost'),
+        priority=96)
 
     trainer.extend(
         ConditionalRestart(
             monitor='validation/main/generator/cost', mode='min',
-            check_trigger=(1, 'epoch'), patients=2))
+            patients=2))
 
 
     if gpu < 0:
